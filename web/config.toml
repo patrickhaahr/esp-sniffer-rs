@@ -3,7 +3,8 @@ host = "0.0.0.0"
 port = 3000
 
 [mqtt]
-broker = "mqtt://192.168.0.148:1883"
+# Broker URL - overridden by MQTT_BROKER environment variable if set
+broker = "mqtt://192.168.0.149:1883"
 topic = "sniffer/+/device"
 
 [room]

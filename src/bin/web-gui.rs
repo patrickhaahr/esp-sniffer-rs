@@ -245,8 +245,9 @@ async fn websocket_connection(socket: WebSocket, state: AppState) {
 
 /// MQTT subscriber task
 async fn mqtt_subscriber(state: AppState) -> Result<()> {
-    // Parse MQTT broker URL
-    let broker_url = state.config.mqtt.broker.clone();
+    // Parse MQTT broker URL - prefer environment variable over config file
+    let broker_url = std::env::var("MQTT_BROKER")
+        .unwrap_or_else(|_| state.config.mqtt.broker.clone());
     let broker_url = broker_url.strip_prefix("mqtt://").unwrap_or(&broker_url);
     let parts: Vec<&str> = broker_url.split(':').collect();
     let host = parts[0];

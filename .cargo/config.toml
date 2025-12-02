@@ -1,6 +1,6 @@
 [alias]
 br = "build --release"
-fr = ["run", "--release"]  # build + flash + monitor
+fr = ["run", "--release", "--bin", "esp-sniffer-rs"]  # build + flash + monitor
 
 # Web GUI aliases for different platforms
 web = ["run", "--bin", "web-gui", "--features", "web-gui", "--target", "aarch64-apple-darwin", "--no-default-features", "--release"]
