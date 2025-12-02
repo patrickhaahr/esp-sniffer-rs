@@ -12,9 +12,10 @@ const MQTT_TOPIC_PREFIX: &str = "sniffer";
 const CHANNEL_CAPACITY: usize = 32;
 
 /// Device detection event to publish (fixed size, no heap allocation)
+/// MAC address is stored as a SHA-256 hash for privacy
 #[derive(Debug, Clone, Copy)]
 pub struct DeviceEvent {
-    pub mac: [u8; 6],
+    pub mac_hash: [u8; 32],
     pub rssi: i8,
     pub channel: u8,
     pub timestamp: u64,
@@ -90,18 +91,17 @@ impl MqttPublisher {
 
     /// Publish a device event to MQTT
     fn publish_event(&mut self, event: &DeviceEvent) -> Result<()> {
-        // Format MAC address
-        let mac = format!(
-            "{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
-            event.mac[0], event.mac[1], event.mac[2],
-            event.mac[3], event.mac[4], event.mac[5]
-        );
+        // Format hashed MAC address as hex string (64 chars for 32 bytes)
+        let mut mac_hex = String::with_capacity(64);
+        for byte in &event.mac_hash {
+            mac_hex.push_str(&format!("{:02x}", byte));
+        }
 
         // Use a fixed-size buffer to avoid heap allocation
-        let mut payload = [0u8; 150];
+        let mut payload = [0u8; 200];  // Increased size for longer hash
         let payload_str = format!(
-            r#"{{"mac":"{}","rssi":{},"channel":{},"timestamp":{},"station":"{}"}}"#,
-            mac, event.rssi, event.channel, event.timestamp, self.station_id
+            r#"{{"mac_hash":"{}","rssi":{},"channel":{},"timestamp":{},"station":"{}"}}"#,
+            mac_hex, event.rssi, event.channel, event.timestamp, self.station_id
         );
 
         let len = payload_str.len().min(payload.len());

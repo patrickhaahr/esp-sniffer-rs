@@ -322,7 +322,7 @@
 
             // Draw devices
             const now = Date.now() / 1000;
-            for (const [mac, deviceData] of devices.entries()) {
+            for (const [mac_hash, deviceData] of devices.entries()) {
                 const age = now - deviceData.last_seen;
 
                 // Calculate opacity based on age
@@ -331,7 +331,7 @@
                     opacity = Math.max(0.2, 1.0 - (age - 5) / 10);
                 }
 
-                let x, y;
+                    let x, y;
 
                 // Use server-calculated triangulated position if available
                 if (deviceData.position && deviceData.position.x !== undefined) {
@@ -345,7 +345,7 @@
                         x = toCanvasX(station.x);
                         y = toCanvasY(station.y);
                         // Add deterministic offset based on MAC hash so devices don't overlap
-                        const hash = mac.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+                        const hash = mac_hash.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
                         x += ((hash % 60) - 30);
                         y += (((hash * 7) % 60) - 30);
                     } else {
@@ -371,12 +371,12 @@
                 ctx.arc(x, y, 8, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Draw MAC label
-                const shortMac = mac.split(':').slice(-2).join(':');
+                // Draw hash label (first 6 chars)
+                const shortHash = mac_hash.substring(0, 6);
                 ctx.fillStyle = `rgba(224, 224, 224, ${opacity})`;
                 ctx.font = '10px monospace';
                 ctx.textAlign = 'center';
-                ctx.fillText(shortMac, x, y - 12);
+                ctx.fillText(shortHash, x, y - 12);
             }
         }
 
@@ -431,10 +431,13 @@
                         </div>
                     `).join('');
 
+                // Display shortened hash (first 16 chars for readability)
+                const displayHash = device.mac_hash.substring(0, 16) + '...';
+                
                 return `
                     <div class="device-card">
                         <div class="device-header">
-                            <span>${device.mac}</span>
+                            <span title="${device.mac_hash}">${displayHash}</span>
                             <span class="device-time">${ageText}</span>
                         </div>
                         <div class="device-readings">
@@ -470,7 +473,7 @@
                     // Update devices map
                     devices.clear();
                     for (const device of deviceList) {
-                        devices.set(device.mac, device);
+                        devices.set(device.mac_hash, device);
                     }
 
                     // Redraw

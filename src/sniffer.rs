@@ -15,6 +15,7 @@ use esp_idf_svc::sys::{
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex;
 use std::sync::mpsc::SyncSender;
+use sha2::{Sha256, Digest};
 use crate::mqtt::DeviceEvent;
 
 /// Packet counter for statistics
@@ -65,6 +66,16 @@ impl MacAddress {
     /// Check if this is a multicast address (first byte has LSB set)
     pub fn is_multicast(&self) -> bool {
         self.0[0] & 0x01 != 0
+    }
+
+    /// Hash the MAC address using SHA-256 and return as hex string
+    pub fn hash(&self) -> [u8; 32] {
+        let mut hasher = Sha256::new();
+        hasher.update(&self.0);
+        let result = hasher.finalize();
+        let mut hash = [0u8; 32];
+        hash.copy_from_slice(&result);
+        hash
     }
 }
 
@@ -141,8 +152,11 @@ unsafe extern "C" fn promiscuous_rx_callback(
         // Send event to MQTT publisher (non-blocking, drops if full)
         if let Ok(guard) = EVENT_SENDER.try_lock() {
             if let Some(sender) = guard.as_ref() {
+                // Hash the MAC address for privacy
+                let mac_hash = source_mac.hash();
+                
                 let event = DeviceEvent {
-                    mac: source_mac.0,  // Use raw bytes, no allocation
+                    mac_hash,
                     rssi,
                     channel,
                     timestamp,

@@ -93,7 +93,7 @@ struct DisplayConfig {
 /// MQTT device event from ESP32
 #[derive(Debug, Deserialize)]
 struct MqttDeviceEvent {
-    mac: String,
+    mac_hash: String,
     rssi: i8,
     channel: u8,
     timestamp: u64,
@@ -110,7 +110,7 @@ struct RssiReading {
 /// Device state with readings from all stations
 #[derive(Debug, Clone, Serialize)]
 struct DeviceState {
-    mac: String,
+    mac_hash: String,
     readings: HashMap<String, RssiReading>,
     last_seen: u64,
     /// Calculated position from triangulation (None if insufficient data)
@@ -135,9 +135,13 @@ async fn main() -> Result<()> {
     let config_path = Path::new("web/config.toml");
     let config_str = fs::read_to_string(config_path)?;
     let config: Config = toml::from_str(&config_str)?;
-    
+
     log::info!("Loaded configuration:");
-    log::info!("  Room: {}x{} meters", config.room.width, config.room.height);
+    log::info!(
+        "  Room: {}x{} meters",
+        config.room.width,
+        config.room.height
+    );
     log::info!("  Stations: {}", config.stations.len());
     for station in &config.stations {
         log::info!("    {} at ({}, {})", station.id, station.x, station.y);
@@ -171,7 +175,7 @@ async fn main() -> Result<()> {
 
     let addr = format!("{}:{}", state.config.server.host, state.config.server.port);
     log::info!("Starting web server on http://{}", addr);
-    
+
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     axum::serve(listener, app).await?;
 
@@ -181,12 +185,15 @@ async fn main() -> Result<()> {
 /// Serve the main HTML page
 async fn index_handler(State(_state): State<AppState>) -> impl IntoResponse {
     let html_path = Path::new("web/index.html");
-    
+
     match fs::read_to_string(html_path) {
         Ok(html) => Html(html),
         Err(e) => {
             log::error!("Failed to read index.html: {:?}", e);
-            Html(format!("<html><body><h1>Error loading page: {:?}</h1></body></html>", e))
+            Html(format!(
+                "<html><body><h1>Error loading page: {:?}</h1></body></html>",
+                e
+            ))
         }
     }
 }
@@ -202,19 +209,19 @@ async fn websocket_handler(
 /// Handle WebSocket connection
 async fn websocket_connection(socket: WebSocket, state: AppState) {
     let (mut sender, mut receiver) = socket.split();
-    
+
     log::info!("New WebSocket connection");
 
     // Spawn a task to broadcast device updates
     let tx_task = tokio::spawn(async move {
         loop {
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-            
+
             // Read current device state
             let devices = state.devices.read().await;
             let device_list: Vec<DeviceState> = devices.values().cloned().collect();
             drop(devices);
-            
+
             // Serialize and send
             if let Ok(json) = serde_json::to_string(&device_list) {
                 if sender.send(Message::Text(json)).await.is_err() {
@@ -268,12 +275,15 @@ async fn mqtt_subscriber(state: AppState) -> Result<()> {
                         // Update device state
                         let mut devices = state.devices.write().await;
 
-                        let device = devices.entry(event.mac.clone()).or_insert_with(|| DeviceState {
-                            mac: event.mac.clone(),
-                            readings: HashMap::new(),
-                            last_seen: event.timestamp,
-                            position: None,
-                        });
+                        let device =
+                            devices
+                                .entry(event.mac_hash.clone())
+                                .or_insert_with(|| DeviceState {
+                                    mac_hash: event.mac_hash.clone(),
+                                    readings: HashMap::new(),
+                                    last_seen: event.timestamp,
+                                    position: None,
+                                });
 
                         device.readings.insert(
                             event.station.clone(),
@@ -303,11 +313,11 @@ async fn mqtt_subscriber(state: AppState) -> Result<()> {
                         // Update position with smoothing (requires mutable access)
                         let mut tracker = state.position_tracker.write().await;
                         device.position =
-                            tracker.update_position(&event.mac, &readings_for_triangulation);
+                            tracker.update_position(&event.mac_hash, &readings_for_triangulation);
 
                         log::debug!(
-                            "Device {} seen by {} with RSSI {}, position: {:?}",
-                            event.mac,
+                            "Device {} seen by {} with RSSI {}",
+                            event.mac_hash,
                             event.station,
                             event.rssi,
                             device.position
@@ -321,7 +331,7 @@ async fn mqtt_subscriber(state: AppState) -> Result<()> {
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             }
         }
-        
+
         // Periodically clean up old devices
         if rand::random::<u8>() < 10 {
             cleanup_old_devices(&state).await;
