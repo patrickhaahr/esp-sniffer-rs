@@ -1,0 +1,25 @@
+#set page(paper: "a5")
+#set heading(numbering: none)
+#set text(lang: "da", size: 13pt)
+
+= Logbog
+
+== 1. Dag (01-12-2025)
+
+=== Andrei
+Rust install
+
+=== Patrick
+Inital opsætning af esp-idf repo.
+WiFi setup
+MQTT broker docker compose
+
+== 2. Dag (02-12-2025)
+
+=== Andrei
+
+=== Patrick
+Logbog + arbeds-portfolio
+
+=== Hans
+

@@ -1,0 +1,23 @@
+#set page(paper: "a4")
+#set text(lang: "da", size: 13pt)
+#set heading(numbering: none)
+
+= Arbejdsportfolio
+
+Dette dokument fungerer som projektets arbejdsportfolio. Formålet er at dokumentere processen "fra idé til færdig løsning". Her beskrives alle ideer og beslutninger, som fører til løsning af projektets elementer – fra den spæde idé, via skitser, til den endelige implementering.
+
+== Teknologier
+
+Vi har valgt at skrive projektets software i *Rust*.
+
+Til dette benytter vi *esp-rs/esp-idf-template*, 
+som er community udviklet af specifikt til at understøtte Rust på ESP32-platformen. 
+Dette giver os fordelene ved Rusts hukommelsessikkerhed kombineret med direkte adgang til hardwaren gennem værktøjer 
+og biblioteker, der er målrettet netop denne platform.
+
+== Overvejelser
+
+Master-slave 
+backups af master - giv hver esp32 et tilfældigt tal. laveste tal er master.
+
+slaves sender data til master og master kalkulere position af mobil. 
