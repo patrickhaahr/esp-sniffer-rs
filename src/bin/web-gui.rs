@@ -20,6 +20,11 @@ use std::{
 use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
 
+// Import triangulation module from library
+use esp_sniffer_rs::triangulate::{
+    CalibrationParams, Position, RssiReading as TriangulateRssiReading, StationLike, Triangulator,
+};
+
 /// Configuration file structure
 #[derive(Debug, Deserialize)]
 struct Config {
@@ -54,6 +59,29 @@ struct StationConfig {
     x: f32,
     y: f32,
     label: String,
+    /// Reference RSSI at 1 meter (optional, defaults to -45.0)
+    rssi_at_1m: Option<f32>,
+    /// Path loss exponent (optional, defaults to 3.0)
+    path_loss_exponent: Option<f32>,
+}
+
+// Implement StationLike trait for StationConfig to use with Triangulator
+impl StationLike for StationConfig {
+    fn id(&self) -> &str {
+        &self.id
+    }
+    fn x(&self) -> f32 {
+        self.x
+    }
+    fn y(&self) -> f32 {
+        self.y
+    }
+    fn calibration(&self) -> CalibrationParams {
+        CalibrationParams {
+            rssi_at_1m: self.rssi_at_1m.unwrap_or(-45.0),
+            path_loss_exponent: self.path_loss_exponent.unwrap_or(3.0),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -85,6 +113,8 @@ struct DeviceState {
     mac: String,
     readings: HashMap<String, RssiReading>,
     last_seen: u64,
+    /// Calculated position from triangulation (None if insufficient data)
+    position: Option<Position>,
 }
 
 /// Shared application state
@@ -92,6 +122,8 @@ struct DeviceState {
 struct AppState {
     devices: Arc<RwLock<HashMap<String, DeviceState>>>,
     config: Arc<Config>,
+    /// Triangulator for calculating device positions
+    triangulator: Arc<Triangulator>,
 }
 
 #[tokio::main]
@@ -111,10 +143,15 @@ async fn main() -> Result<()> {
         log::info!("    {} at ({}, {})", station.id, station.x, station.y);
     }
 
+    // Create triangulator from station configurations
+    let triangulator = Triangulator::new(&config.stations);
+    log::info!("Triangulator initialized with {} stations", config.stations.len());
+
     // Create shared state
     let state = AppState {
         devices: Arc::new(RwLock::new(HashMap::new())),
         config: Arc::new(config),
+        triangulator: Arc::new(triangulator),
     };
 
     // Start MQTT subscriber
@@ -230,13 +267,14 @@ async fn mqtt_subscriber(state: AppState) -> Result<()> {
                     if let Ok(event) = serde_json::from_str::<MqttDeviceEvent>(payload) {
                         // Update device state
                         let mut devices = state.devices.write().await;
-                        
+
                         let device = devices.entry(event.mac.clone()).or_insert_with(|| DeviceState {
                             mac: event.mac.clone(),
                             readings: HashMap::new(),
                             last_seen: event.timestamp,
+                            position: None,
                         });
-                        
+
                         device.readings.insert(
                             event.station.clone(),
                             RssiReading {
@@ -245,12 +283,32 @@ async fn mqtt_subscriber(state: AppState) -> Result<()> {
                             },
                         );
                         device.last_seen = event.timestamp;
-                        
+
+                        // Calculate position using triangulation
+                        let readings_for_triangulation: HashMap<String, TriangulateRssiReading> =
+                            device
+                                .readings
+                                .iter()
+                                .map(|(k, v)| {
+                                    (
+                                        k.clone(),
+                                        TriangulateRssiReading {
+                                            rssi: v.rssi,
+                                            timestamp: v.timestamp,
+                                        },
+                                    )
+                                })
+                                .collect();
+
+                        device.position =
+                            state.triangulator.calculate_position(&readings_for_triangulation);
+
                         log::debug!(
-                            "Device {} seen by {} with RSSI {}",
+                            "Device {} seen by {} with RSSI {}, position: {:?}",
                             event.mac,
                             event.station,
-                            event.rssi
+                            event.rssi,
+                            device.position
                         );
                     }
                 }
@@ -270,22 +328,9 @@ async fn mqtt_subscriber(state: AppState) -> Result<()> {
 }
 
 /// Remove devices that haven't been seen recently
-async fn cleanup_old_devices(state: &AppState) {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-    
-    let timeout = state.config.display.device_timeout;
-    
-    let mut devices = state.devices.write().await;
-    devices.retain(|mac, device| {
-        let keep = now - device.last_seen < timeout;
-        if !keep {
-            log::info!("Removing stale device: {}", mac);
-        }
-        keep
-    });
+/// NOTE: Stale device removal is disabled - all devices are kept indefinitely
+async fn cleanup_old_devices(_state: &AppState) {
+    // Stale device removal disabled - keeping all devices
 }
 
 // Import for stream operations

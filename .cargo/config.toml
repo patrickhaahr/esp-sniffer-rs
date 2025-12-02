@@ -1,7 +1,12 @@
 [alias]
 br = "build --release"
 fr = ["run", "--release"]  # build + flash + monitor
-web = ["run", "--bin", "web-gui", "--features", "web-gui", "--target", "x86_64-unknown-linux-gnu", "--no-default-features", "--release"]
+
+# Web GUI aliases for different platforms
+web = ["run", "--bin", "web-gui", "--features", "web-gui", "--target", "aarch64-apple-darwin", "--no-default-features", "--release"]
+web-m = ["run", "--bin", "web-gui", "--features", "web-gui", "--target", "aarch64-apple-darwin", "--no-default-features", "--release"]
+web-l = ["build", "--bin", "web-gui", "--features", "web-gui", "--target", "x86_64-unknown-linux-gnu", "--no-default-features", "--release"]
+web-w = ["build", "--bin", "web-gui", "--features", "web-gui", "--target", "x86_64-pc-windows-msvc", "--no-default-features", "--release"]
 
 [build]
 target = "xtensa-esp32-espidf"

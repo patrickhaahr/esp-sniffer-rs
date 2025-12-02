@@ -50,7 +50,7 @@ toml = { version = "0.8", optional = true }
 futures-util = { version = "0.3", optional = true }
 rand = { version = "0.8", optional = true }
 env_logger = { version = "0.11", optional = true }
-rumqttc = { version = "0.24", optional = true, default-features = false, features = ["use-native-tls"] }
+rumqttc = { version = "0.24", optional = true, default-features = false, features = ["use-rustls"] }
 
 # --- Optional Embassy Integration ---
 # esp-idf-svc = { version = "0.51", features = ["critical-section", "embassy-time-driver", "embassy-sync"] }

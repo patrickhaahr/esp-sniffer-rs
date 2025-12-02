@@ -230,11 +230,11 @@
         const CANVAS_HEIGHT = 900; // pixels
         const SCALE = CANVAS_WIDTH / ROOM_WIDTH; // 100px per meter
 
-        // Station positions (in meters) - loaded from config
+        // Station positions (in meters) - must match STATION_ID on each ESP32
         const stations = {
-            '1': { x: 0.5, y: 0.5, label: 'Station 1' },
-            '2': { x: 4.5, y: 0.5, label: 'Station 2' },
-            '3': { x: 2.5, y: 8.5, label: 'Station 3' }
+            'station1': { x: 0.5, y: 0.5, label: 'Station 1' },
+            'station2': { x: 4.5, y: 0.5, label: 'Station 2' },
+            'station3': { x: 2.5, y: 8.5, label: 'Station 3' }
         };
 
         // Canvas setup
@@ -324,37 +324,59 @@
             const now = Date.now() / 1000;
             for (const [mac, deviceData] of devices.entries()) {
                 const age = now - deviceData.last_seen;
-                
+
                 // Calculate opacity based on age
                 let opacity = 1.0;
                 if (age > 5) {
                     opacity = Math.max(0.2, 1.0 - (age - 5) / 10);
                 }
 
-                // Position at strongest signal station
-                const strongestStation = getStrongestStation(deviceData);
-                if (strongestStation && stations[strongestStation]) {
-                    const station = stations[strongestStation];
-                    const x = toCanvasX(station.x);
-                    const y = toCanvasY(station.y);
+                let x, y;
 
-                    // Add small random offset so devices don't overlap exactly
-                    const offsetX = (Math.random() - 0.5) * 30;
-                    const offsetY = (Math.random() - 0.5) * 30;
-
-                    // Draw device circle
-                    ctx.fillStyle = `rgba(244, 67, 54, ${opacity})`;
-                    ctx.beginPath();
-                    ctx.arc(x + offsetX, y + offsetY, 8, 0, Math.PI * 2);
-                    ctx.fill();
-
-                    // Draw MAC label
-                    const shortMac = mac.split(':').slice(-2).join(':');
-                    ctx.fillStyle = `rgba(224, 224, 224, ${opacity})`;
-                    ctx.font = '10px monospace';
-                    ctx.textAlign = 'center';
-                    ctx.fillText(shortMac, x + offsetX, y + offsetY - 12);
+                // Use server-calculated triangulated position if available
+                if (deviceData.position && deviceData.position.x !== undefined) {
+                    x = toCanvasX(deviceData.position.x);
+                    y = toCanvasY(deviceData.position.y);
+                } else {
+                    // Fallback: position at strongest station (backward compatibility)
+                    const strongestStation = getStrongestStation(deviceData);
+                    if (strongestStation && stations[strongestStation]) {
+                        const station = stations[strongestStation];
+                        x = toCanvasX(station.x);
+                        y = toCanvasY(station.y);
+                        // Add deterministic offset based on MAC hash so devices don't overlap
+                        const hash = mac.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+                        x += ((hash % 60) - 30);
+                        y += (((hash * 7) % 60) - 30);
+                    } else {
+                        continue; // Skip if no position available
+                    }
                 }
+
+                // Draw confidence indicator based on station count
+                const stationCount = Object.keys(deviceData.readings).length;
+                if (deviceData.position && stationCount >= 2) {
+                    // Draw uncertainty circle - smaller for more stations
+                    const radius = stationCount >= 3 ? 20 : 35;
+                    const color = stationCount >= 3 ? 'rgba(76, 175, 80, 0.2)' : 'rgba(255, 193, 7, 0.2)';
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Draw device circle
+                ctx.fillStyle = `rgba(244, 67, 54, ${opacity})`;
+                ctx.beginPath();
+                ctx.arc(x, y, 8, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Draw MAC label
+                const shortMac = mac.split(':').slice(-2).join(':');
+                ctx.fillStyle = `rgba(224, 224, 224, ${opacity})`;
+                ctx.font = '10px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(shortMac, x, y - 12);
             }
         }
 
@@ -387,6 +409,19 @@
                     return 'rssi-weak';
                 }
 
+                // Position display
+                const positionHtml = device.position
+                    ? `<div class="reading">
+                         <span class="reading-station">Position</span>
+                         <span class="reading-rssi rssi-strong">
+                           (${device.position.x.toFixed(2)}m, ${device.position.y.toFixed(2)}m)
+                         </span>
+                       </div>`
+                    : `<div class="reading">
+                         <span class="reading-station">Position</span>
+                         <span class="reading-rssi" style="color: #888;">Calculating...</span>
+                       </div>`;
+
                 const readingsHtml = Object.entries(device.readings)
                     .sort((a, b) => b[1].rssi - a[1].rssi)
                     .map(([stationId, reading]) => `
@@ -403,6 +438,7 @@
                             <span class="device-time">${ageText}</span>
                         </div>
                         <div class="device-readings">
+                            ${positionHtml}
                             ${readingsHtml}
                         </div>
                     </div>

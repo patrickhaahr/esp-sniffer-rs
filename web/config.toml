@@ -11,24 +11,31 @@ width = 5.0
 height = 9.0
 
 # ESP32 sniffer positions (in meters)
-# Adjust these coordinates to match your actual setup
+# IMPORTANT: Station IDs must match the STATION_ID env var on each ESP32
 [[stations]]
-id = "1"
+id = "station1"
 x = 0.5
 y = 0.5
 label = "Station 1"
+# Calibration parameters (optional - uses defaults if not specified)
+rssi_at_1m = -45.0          # Reference RSSI at 1 meter (-40 to -50 typical)
+path_loss_exponent = 3.0    # Indoor path loss (2.0 free space, 2.5-4.0 indoor)
 
 [[stations]]
-id = "2"
+id = "station2"
 x = 4.5
 y = 0.5
 label = "Station 2"
+rssi_at_1m = -45.0
+path_loss_exponent = 3.0
 
 [[stations]]
-id = "3"
+id = "station3"
 x = 2.5
 y = 8.5
 label = "Station 3"
+rssi_at_1m = -45.0
+path_loss_exponent = 3.0
 
 [display]
 device_timeout = 30  # seconds before removing device from display
