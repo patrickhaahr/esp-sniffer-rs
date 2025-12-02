@@ -15,7 +15,7 @@ use std::{
     fs,
     path::Path,
     sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
+    time::Duration,
 };
 use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
@@ -316,7 +316,7 @@ async fn mqtt_subscriber(state: AppState) -> Result<()> {
                             tracker.update_position(&event.mac_hash, &readings_for_triangulation);
 
                         log::debug!(
-                            "Device {} seen by {} with RSSI {}",
+                            "Device {} seen by {} with RSSI {}, position: {:?}",
                             event.mac_hash,
                             event.station,
                             event.rssi,
