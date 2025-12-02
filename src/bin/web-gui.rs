@@ -22,7 +22,7 @@ use tower_http::cors::CorsLayer;
 
 // Import triangulation module from library
 use esp_sniffer_rs::triangulate::{
-    CalibrationParams, Position, RssiReading as TriangulateRssiReading, StationLike, Triangulator,
+    CalibrationParams, Position, RssiReading as TriangulateRssiReading, StationLike, PositionTracker,
 };
 
 /// Configuration file structure
@@ -122,8 +122,8 @@ struct DeviceState {
 struct AppState {
     devices: Arc<RwLock<HashMap<String, DeviceState>>>,
     config: Arc<Config>,
-    /// Triangulator for calculating device positions
-    triangulator: Arc<Triangulator>,
+    /// Position tracker for calculating and smoothing device positions
+    position_tracker: Arc<RwLock<PositionTracker>>,
 }
 
 #[tokio::main]
@@ -143,15 +143,15 @@ async fn main() -> Result<()> {
         log::info!("    {} at ({}, {})", station.id, station.x, station.y);
     }
 
-    // Create triangulator from station configurations
-    let triangulator = Triangulator::new(&config.stations);
-    log::info!("Triangulator initialized with {} stations", config.stations.len());
+    // Create position tracker from station configurations
+    let position_tracker = PositionTracker::new(&config.stations);
+    log::info!("Position tracker initialized with {} stations", config.stations.len());
 
     // Create shared state
     let state = AppState {
         devices: Arc::new(RwLock::new(HashMap::new())),
         config: Arc::new(config),
-        triangulator: Arc::new(triangulator),
+        position_tracker: Arc::new(RwLock::new(position_tracker)),
     };
 
     // Start MQTT subscriber
@@ -284,7 +284,7 @@ async fn mqtt_subscriber(state: AppState) -> Result<()> {
                         );
                         device.last_seen = event.timestamp;
 
-                        // Calculate position using triangulation
+                        // Calculate smoothed position using position tracker
                         let readings_for_triangulation: HashMap<String, TriangulateRssiReading> =
                             device
                                 .readings
@@ -300,8 +300,10 @@ async fn mqtt_subscriber(state: AppState) -> Result<()> {
                                 })
                                 .collect();
 
+                        // Update position with smoothing (requires mutable access)
+                        let mut tracker = state.position_tracker.write().await;
                         device.position =
-                            state.triangulator.calculate_position(&readings_for_triangulation);
+                            tracker.update_position(&event.mac, &readings_for_triangulation);
 
                         log::debug!(
                             "Device {} seen by {} with RSSI {}, position: {:?}",
