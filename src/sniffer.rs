@@ -23,7 +23,8 @@ static DROPPED_COUNT: AtomicU32 = AtomicU32::new(0);
 static SENT_COUNT: AtomicU32 = AtomicU32::new(0);
 
 /// Rate limit: only send 1 event per N packets to avoid overwhelming MQTT
-const SEND_RATE: u32 = 50;
+/// Lower value = faster updates (more MQTT messages)
+const SEND_RATE: u32 = 10;
 
 /// Global event sender for the callback
 static EVENT_SENDER: Mutex<Option<SyncSender<DeviceEvent>>> = Mutex::new(None);
