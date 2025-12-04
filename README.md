@@ -1,4 +1,4 @@
-# ESP WiFi Sniffer (Rust)
+# ESP WiFi Sniffer
 
 A privacy-focused ESP32 WiFi sniffer system that detects and tracks WiFi devices using RSSI-based trilateration. Built with Rust for the ESP32, with a web-based real-time visualization dashboard.
 
@@ -14,29 +14,49 @@ A privacy-focused ESP32 WiFi sniffer system that detects and tracks WiFi devices
 ## Architecture
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   ESP32     │     │   ESP32     │     │   ESP32     │
-│  Station 1  │     │  Station 2  │     │  Station 3  │
-│             │     │             │     │             │
-│  Sniffs WiFi│     │  Sniffs WiFi│     │  Sniffs WiFi│
-│  Hash MAC   │     │  Hash MAC   │     │  Hash MAC   │
-└──────┬──────┘     └──────┬──────┘     └──────┬──────┘
-       │                   │                   │
-       └───────────────────┴───────────────────┘
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│    ESP32     │     │    ESP32     │     │    ESP32     │
+│   Station 1  │     │   Station 2  │     │   Station 3  │
+│              │     │              │     │              │
+│  Sniffs WiFi │     │  Sniffs WiFi │     │  Sniffs WiFi │
+│   Hash MAC   │     │   Hash MAC   │     │   Hash MAC   │
+└──────┬───────┘     └──────┬───────┘     └──────┬───────┘
+       │                    │                    │
+       └────────────────────┴────────────────────┘
                             │
-                     ┌──────▼──────┐
-                     │    MQTT     │
-                     │   Broker    │
-                     │  (MQTTS)    │
-                     └──────┬──────┘
+                     ┌──────▼───────┐
+                     │     MQTT     │
+                     │    Broker    │
+                     └──────┬───────┘
                             │
-                     ┌──────▼──────┐
-                     │  Web GUI    │
-                     │  (HTTPS)    │
-                     │             │
-                     │ Triangulate │
-                     │ Visualize   │
-                     └─────────────┘
+                     ┌──────▼───────┐
+                     │    Web GUI   │
+                     │    (HTTPS)   │
+                     └──────────────┘
+```
+
+## Quick Start Summary
+
+```bash
+# 1. Configure environment
+cp .env.example .env
+# Edit .env with your SERVER_IP, WIFI_SSID, WIFI_PASS, MQTT_BROKER=mqtts://...
+
+# 2. Generate TLS certificates
+./genssl.sh
+
+# 3. Start MQTT broker
+docker-compose up -d
+
+# 4. Flash ESP32 (repeat for each station)
+# Edit STATION_ID in .env, then:
+cargo fr
+
+# 5. Start web GUI
+cargo web-l 
+
+# 6. Open browser to https://localhost:3000
+# 7. Monitor MQTT: mosquitto_sub -h $SERVER_IP -p 8883 --cafile ./certs/ca.crt -t '#' -u elev1 -P password -v
 ```
 
 ## Security
@@ -46,7 +66,7 @@ All communications are encrypted with TLS 1.3:
 - **ESP32 → MQTT**: MQTTS on port 8883 with CA certificate verification
 - **Web GUI → MQTT**: MQTTS on port 8883 with CA certificate verification  
 - **Browser → Web GUI**: HTTPS on port 3000 with self-signed certificate
-- **WebSocket**: WSS (secure WebSocket) automatically over HTTPS
+- **WebSocket**: WSS automatically over HTTPS
 
 ## Privacy & GDPR Compliance
 
@@ -57,36 +77,19 @@ This system is designed with privacy in mind:
 - **No Raw Packet Logging**: Raw 802.11 frames are never logged or stored
 - **Local Processing**: All data stays within your local network
 
-## Requirements
-
-### Hardware
-- 3+ ESP32 development boards (ESP32, ESP32-C3, ESP32-S3, etc.)
-- USB cables for flashing and power
-- WiFi network for MQTT communication
-
-### Software
-- Rust (with ESP32 toolchain)
-- Cargo
-- espflash or cargo-espflash
-- Docker (for MQTT broker, optional)
-
 ## Installation
 
-### 1. Clone the Repository
+### 1. Install ESP32 Rust Toolchain
 
+Follow the [esp-rs installation guide](https://docs.espressif.com/projects/rust/book/getting-started/toolchain.html)
+Follow the [esp-idf-template installation guide](https://github.com/esp-rs/esp-idf-template?tab=readme-ov-file#prerequisites) if needed
+
+
+### 2. Clone the Repository
+    
 ```bash
 git clone https://github.com/patrickhaahr/esp-sniffer-rs.git
 cd esp-sniffer-rs
-```
-
-### 2. Install ESP32 Rust Toolchain
-
-Follow the [esp-rs installation guide](https://docs.esp-rs.org/book/installation/index.html):
-
-```bash
-cargo install espup
-espup install
-. $HOME/export-rs.sh  # Or add to your shell profile
 ```
 
 ### 3. Generate TLS Certificates
@@ -98,12 +101,12 @@ espup install
 cp .env.example .env
 
 # Edit .env with your server IP (the machine running MQTT broker and web GUI)
-SERVER_IP=192.168.1.100  # Your server's IP address
+SERVER_IP=192.168.1.100 
 WIFI_SSID=your_network_name
 WIFI_PASS=your_network_password
-MQTT_BROKER=mqtts://192.168.1.100:8883  # Note: mqtts:// for TLS
-MQTT_USERNAME=elev1  # MQTT authentication username
-MQTT_PASSWORD=password  # MQTT authentication password
+MQTT_BROKER=mqtts://192.168.1.100:8883  
+MQTT_USERNAME=elev1 
+MQTT_PASSWORD=password 
 STATION_ID=station1
 
 # Generate TLS certificates and MQTT password file
@@ -143,8 +146,8 @@ Edit `web/config.toml` to match your physical setup:
 
 ```toml
 [room]
-width = 5.0   # Room width in meters
-height = 9.0  # Room height in meters
+width = 5.0              # Room width in meters
+height = 9.0             # Room height in meters   
 
 [[stations]]
 id = "station1"          # Must match STATION_ID in .env
@@ -175,6 +178,10 @@ This command will:
 
 ### View Real-time Data
 
+```bash
+cargo web-*  # replace "*" with: l = Linux, m = MacOS, w = Windows
+```
+
 1. Open browser to `https://localhost:3000` (accept self-signed certificate warning)
 2. You'll see a 2D visualization of the room with:
    - Station positions (fixed markers)
@@ -183,28 +190,15 @@ This command will:
    - RSSI values and signal strength indicators
    - Real-time triangulation positioning
 
-### Monitor MQTT Messages
-
-View device detection data in real-time:
-
-```bash
-# Monitor all MQTT topics with TLS
-mosquitto_sub -h 192.168.1.100 -p 8883 --cafile ./certs/ca.crt -t '#' -v
-
-# Monitor only device events
-mosquitto_sub -h 192.168.1.100 -p 8883 --cafile ./certs/ca.crt -t 'sniffer/+/device' -v
-```
-
 ## CLI Commands
 
-| Command | Description |
-|---------|-------------|
-| `cargo fr` | Flash firmware to ESP32 with serial monitor |
-| `cargo br` | Build ESP32 firmware only (release mode) |
-| `cargo web` | Run web GUI (cross-platform) |
-| `cargo web-l` | Run web GUI (Linux-optimized) |
-| `cargo web-m` | Run web GUI (macOS Apple Silicon) |
-| `cargo web-w` | Run web GUI (Windows) |
+| Command     | Description                                 |
+|-------------|---------------------------------------------|
+| `cargo fr`    | Flash firmware to ESP32 with serial monitor |
+| `cargo br`    | Build ESP32 firmware only (release mode)    |
+| `cargo web-l` | Run web GUI (Linux)                         |
+| `cargo web-m` | Run web GUI (MacOS)                         |
+| `cargo web-w` | Run web GUI (Windows)                       |
 
 ## How It Works
 
@@ -257,88 +251,3 @@ max_reading_age_secs = 10        # Ignore readings older than 10s
 min_rssi = -90                   # Ignore weak signals
 max_distance = 50.0              # Ignore unrealistic distance estimates
 ```
-
-## Troubleshooting
-
-### ESP32 Connection Issues
-
-```bash
-# Check serial port
-ls /dev/ttyUSB* /dev/ttyACM*
-
-# Flash with verbose output
-cargo fr
-
-# Or manually with espflash
-espflash flash --release --monitor target/xtensa-esp32-espidf/release/esp-sniffer-rs
-```
-
-### MQTT Connection Issues
-
-```bash
-# Test MQTT broker with TLS
-mosquitto_sub -h <broker-ip> -p 8883 --cafile ./certs/ca.crt -t "sniffer/#" -v
-
-# Check if ESP32 is publishing with TLS
-mosquitto_sub -h <broker-ip> -p 8883 --cafile ./certs/ca.crt -t "sniffer/+/device" -v
-```
-
-### Certificate Issues
-
-```bash
-# Regenerate certificates if needed
-./genssl.sh
-
-# Check certificate files
-ls -la certs/
-# Should show: ca.crt, ca.key, server.crt, server.key
-
-# Verify server certificate
-openssl x509 -in certs/server.crt -text -noout
-```
-
-### HTTPS Certificate Warnings
-
-The web GUI uses a self-signed certificate. In your browser:
-1. Navigate to `https://localhost:3000`
-2. Click "Advanced" → "Proceed to localhost (unsafe)"
-3. The connection is still encrypted, just not signed by a public CA
-
-### Poor Positioning Accuracy
-
-1. **Calibrate RSSI**: Measure actual RSSI at 1 meter and update `rssi_at_1m`
-2. **Adjust Path Loss**: Increase `path_loss_exponent` for environments with more obstacles
-3. **Station Placement**: Position stations in a triangle/polygon for best results
-4. **Reduce Smoothing**: Lower `smoothing_factor` for faster position updates
-
-### TLS/SSL Issues
-
-1. **Certificate Mismatch**: Ensure `SERVER_IP` in `.env` matches the IP where services run
-2. **Port Conflicts**: Make sure port 8883 (MQTT) and 3000 (HTTPS) are available
-3. **Firewall**: Allow incoming connections on ports 8883 and 3000
-4. **Docker Permissions**: Certificate files should have readable permissions (644)
-
-## Quick Start Summary
-
-```bash
-# 1. Configure environment
-cp .env.example .env
-# Edit .env with your SERVER_IP, WIFI_SSID, WIFI_PASS, MQTT_BROKER=mqtts://...
-
-# 2. Generate TLS certificates
-./genssl.sh
-
-# 3. Start MQTT broker
-docker-compose up -d
-
-# 4. Flash ESP32 (repeat for each station)
-# Edit STATION_ID in .env, then:
-cargo fr
-
-# 5. Start web GUI
-cargo web-l
-
-# 6. Open browser to https://localhost:3000
-# 7. Monitor MQTT: mosquitto_sub -h $SERVER_IP -p 8883 --cafile ./certs/ca.crt -t '#' -v
-```
-

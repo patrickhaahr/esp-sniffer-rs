@@ -91,3 +91,8 @@ Vi valgte i stedet en centraliseret arkitektur:
 
 - Finjustere RSSI til afstand-kurver pr. station for bedre estimering
 - Bygge et simpelt heatmap i browseren for at visualisere, hvor mange enheder der er i området over tid
+
+== Ik gå ned på sikerhed
+
+- TLS implementering på alle connections
+- username/password authentication for MQTT

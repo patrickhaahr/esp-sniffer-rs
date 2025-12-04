@@ -21,7 +21,8 @@ Logbog + arbeds-portfolio
 Fikse wifi connectivity problemer
 
 === Patrick
-Logbog + arbeds-portfolio
+- Logbog + arbeds-portfolio
+- Implementering af SHA256 hashing for MAC adresser (for MQTT)
 
 === Hans
 - Implementerede WiFi sniffer callback og MQTT publisher modul
@@ -34,3 +35,8 @@ Logbog + arbeds-portfolio
 
 === Andrei
 Færdigør dokumentation og eftertjæke om vi overholder alle krav. 
+
+=== Patrick
+- TLS 1.3 for alle connections.
+- Username/password authentication for MQTT broker.
+- Update README
