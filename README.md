@@ -2,6 +2,14 @@
 
 A privacy-focused ESP32 WiFi sniffer system that detects and tracks WiFi devices using RSSI-based trilateration. Built with Rust for the ESP32, with a web-based real-time visualization dashboard.
 
+## Web Dashboard Examples
+
+![Single Station Dashboard](docs/station1_only_gui.png)
+*Single ESP32 station connected to the system*
+
+![Full System Dashboard](docs/generated_image_gui.jpg)
+*AI-generated example showing all three ESP32 stations connected (screenshot unavailable)*
+
 ## Features
 
 - **Privacy-First**: MAC addresses are SHA-256 hashed before transmission for GDPR compliance
