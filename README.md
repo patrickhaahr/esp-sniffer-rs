@@ -38,8 +38,13 @@ A privacy-focused ESP32 WiFi sniffer system that detects and tracks WiFi devices
                      └──────┬───────┘
                             │
                      ┌──────▼───────┐
-                     │    Web GUI   │
-                     │    (HTTPS)   │
+                     │   Axum Web   │
+                     │    Server    │
+                     └──────┬───────┘
+                            │
+                     ┌──────▼───────┐
+                     │    Browser   │
+                     │   (Web GUI)  │
                      └──────────────┘
 ```
 
